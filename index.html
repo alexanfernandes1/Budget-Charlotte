@@ -30,6 +30,7 @@
     --serif: "Iowan Old Style","Palatino Linotype",Georgia,"Times New Roman",serif;
     --sans: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     --mono: ui-monospace,"SF Mono",Consolas,monospace;
+    --header-h: 0px;
   }
   body.dark{
     --bg:#0a1420;
@@ -146,6 +147,9 @@
   }
   .icon-btn:hover{color:var(--teal-bright);}
 
+  /* Variante inline de la flèche bas, insérée dans la barre de filtres — seulement utilisée sur petit écran (voir media query plus bas) */
+  .scroll-jump-inline{display:none;}
+
   /* ---------- responsive: compact rows on narrow screens (iPhone etc.) ---------- */
   @media (max-width:640px){
     table.tx thead{display:none;}
@@ -167,6 +171,18 @@
     table.tx td:nth-child(3){order:6;margin-left:auto;margin-top:3px;} /* catégorie, à droite */
     table.tx td:nth-child(4){order:7;margin-top:3px;}              /* compte */
     table.tx td:nth-child(3) .tag, table.tx td:nth-child(4) .tag{font-size:9.5px;padding:1px 6px;}
+
+    /* Sur petit écran, la flèche bas flottante gêne le tableau : on la remplace par une version
+       inline à gauche du champ de recherche (voir .scroll-jump-inline dans la filter-bar). */
+    #scrollDownBtn{display:none;}
+    .scroll-jump-inline{
+      display:flex;align-items:center;justify-content:center;flex:0 0 auto;
+      width:22px;height:22px;border:none;background:none;padding:0;cursor:pointer;
+      font-size:19px;line-height:1;color:var(--teal-bright);
+      opacity:0;pointer-events:none;transition:opacity .2s ease;
+    }
+    .scroll-jump-inline.show{opacity:0.8;pointer-events:auto;}
+    .scroll-jump-inline:hover{opacity:1;}
   }
 
   .filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;}
@@ -191,6 +207,19 @@
     border:none;font-size:26px;cursor:pointer;box-shadow:0 6px 20px rgba(79,179,169,0.35);
     display:flex;align-items:center;justify-content:center;
   }
+
+  /* Boutons de saut haut/bas du tableau : juste la flèche, pas de cadre, un seul visible à la fois */
+  .scroll-jump{
+    position:fixed;left:20px;bottom:26px;z-index:29;
+    width:40px;height:40px;border:none;background:none;padding:0;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    font-size:22px;line-height:1;color:var(--teal-bright);
+    filter:drop-shadow(0 1px 4px rgba(0,0,0,0.35));
+    opacity:0;transform:translateY(6px);pointer-events:none;
+    transition:opacity .2s ease, transform .2s ease;
+  }
+  .scroll-jump.show{opacity:0.8;transform:none;pointer-events:auto;}
+  .scroll-jump:hover{opacity:1;}
 
   /* ---------- modal ---------- */
   .modal-bg{
@@ -257,7 +286,7 @@
 
   /* Barre de KPI compacte et collante au-dessus du tableau de suivi */
   .kpi-bar{
-    position:sticky;top:0;z-index:15;
+    position:sticky;top:var(--header-h);z-index:15;
     display:grid;grid-template-columns:repeat(3,1fr);gap:6px;
     background:var(--bg);padding:8px 0 9px;margin-bottom:8px;
     border-bottom:1px solid var(--line);
@@ -320,6 +349,8 @@
 </main>
 
 <button class="fab" id="fabAdd" title="Ajouter une dépense/recette">+</button>
+<button class="scroll-jump" id="scrollDownBtn" title="Aller en bas du tableau" aria-label="Aller en bas du tableau">↓</button>
+<button class="scroll-jump" id="scrollUpBtn" title="Aller en haut du tableau" aria-label="Aller en haut du tableau">↑</button>
 
 <div class="modal-bg" id="itemModalBg">
   <div class="modal">
@@ -703,6 +734,7 @@ function renderTransactions(){
       <span class="hint"><button class="btn ghost small" id="btnNewMonth">Créer le mois suivant à partir de celui-ci</button></span>
     </div>
     <div class="filter-bar">
+      <button class="scroll-jump-inline" id="scrollDownBtnMobile" title="Aller en bas du tableau" aria-label="Aller en bas du tableau">↓</button>
       <input type="text" id="txSearch" placeholder="Rechercher un libellé…" value="${esc(txFilter.text)}">
       <select id="txCatFilter"><option value="all">Toutes catégories</option>${CATEGORY_TYPES.map(c=>`<option value="${c}" ${txFilter.cat===c?'selected':''}>${c}</option>`).join('')}</select>
       <select id="txStatusFilter">
@@ -727,6 +759,7 @@ function renderTransactions(){
   document.getElementById('txStatusFilter').addEventListener('change', e=>{ txFilter.status = e.target.value; renderTxRows(getMonth(currentKey)); });
   document.getElementById('txRecFilter').addEventListener('change', e=>{ txFilter.rec = e.target.value; renderTxRows(getMonth(currentKey)); });
   document.getElementById('btnNewMonth').addEventListener('click', createNextMonth);
+  document.getElementById('scrollDownBtnMobile').addEventListener('click', scrollToTableBottom);
   renderKpiBar(m);
   renderTxRows(m);
 }
@@ -1082,16 +1115,22 @@ function drawDonut(id, byCat, legendId){
 }
 
 // ===================== NAVIGATION =====================
+function updateHeaderHeight(){
+  const header = document.querySelector('header.top');
+  if(header) document.documentElement.style.setProperty('--header-h', header.offsetHeight+'px');
+}
 function refreshAll(){
   document.getElementById('monthLabel').textContent = monthLabel(currentKey);
   const jump = document.getElementById('monthJump');
   const prevVal = jump.value;
   jump.innerHTML = keys.map(k=>`<option value="${k}">${monthLabel(k)}</option>`).join('');
   jump.value = keys.includes(currentKey)? currentKey : prevVal;
+  updateHeaderHeight();
   renderDashboard();
   renderTransactions();
   renderAnalyses();
   renderEpargne();
+  updateScrollJumpButtons();
 }
 document.getElementById('prevMonth').addEventListener('click', ()=>{ currentKey = shiftKey(currentKey,-1); if(!keys.includes(currentKey)) keys.push(currentKey), keys.sort(); refreshAll(); });
 document.getElementById('nextMonth').addEventListener('click', ()=>{ currentKey = shiftKey(currentKey,1); if(!keys.includes(currentKey)) keys.push(currentKey), keys.sort(); refreshAll(); });
@@ -1103,14 +1142,46 @@ document.querySelectorAll('nav.tabs button').forEach(btn=>{
     btn.classList.add('active');
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     document.getElementById('view-'+btn.dataset.view).classList.add('active');
+    updateScrollJumpButtons();
   });
 });
 
 document.getElementById('fabAdd').addEventListener('click', ()=>openItemModal(null));
 
+// ===================== BOUTONS SAUT HAUT/BAS DU TABLEAU =====================
+// Visibles uniquement sur l'onglet "Suivi du mois" : flèche bas en haut de page, flèche haut en bas de page.
+// Sur petit écran (<=640px), la flèche bas flottante est remplacée par une variante inline
+// dans la filter-bar (#scrollDownBtnMobile, réinjectée à chaque renderTransactions).
+const scrollDownBtn = document.getElementById('scrollDownBtn');
+const scrollUpBtn = document.getElementById('scrollUpBtn');
+function scrollToTableBottom(){ window.scrollTo({top: document.documentElement.scrollHeight, behavior:'smooth'}); }
+function scrollToTableTop(){ window.scrollTo({top:0, behavior:'smooth'}); }
+function updateScrollJumpButtons(){
+  const onTransactions = document.getElementById('view-transactions').classList.contains('active');
+  const downMobile = document.getElementById('scrollDownBtnMobile');
+  if(!onTransactions){
+    scrollDownBtn.classList.remove('show');
+    scrollUpBtn.classList.remove('show');
+    if(downMobile) downMobile.classList.remove('show');
+    return;
+  }
+  const doc = document.documentElement;
+  const threshold = 40;
+  const scrollable = doc.scrollHeight > window.innerHeight + threshold;
+  const nearTop = window.scrollY <= threshold;
+  const nearBottom = window.scrollY + window.innerHeight >= doc.scrollHeight - threshold;
+  const showDown = scrollable && nearTop;
+  scrollDownBtn.classList.toggle('show', showDown);
+  if(downMobile) downMobile.classList.toggle('show', showDown);
+  scrollUpBtn.classList.toggle('show', scrollable && nearBottom && !nearTop);
+}
+scrollDownBtn.addEventListener('click', scrollToTableBottom);
+scrollUpBtn.addEventListener('click', scrollToTableTop);
+window.addEventListener('scroll', updateScrollJumpButtons, {passive:true});
+
 // Redessine les graphiques quand la fenêtre change de taille (rotation iPhone, redimensionnement PC)
 let _resizeT = null;
-window.addEventListener('resize', ()=>{ clearTimeout(_resizeT); _resizeT = setTimeout(()=>refreshAll(), 250); });
+window.addEventListener('resize', ()=>{ clearTimeout(_resizeT); _resizeT = setTimeout(()=>refreshAll(), 250); updateScrollJumpButtons(); });
 document.getElementById('btnCancelItem').addEventListener('click', closeItemModal);
 document.getElementById('btnSaveItem').addEventListener('click', saveItemModal);
 document.getElementById('btnDeleteItem').addEventListener('click', deleteItemModal);
