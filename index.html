@@ -383,8 +383,13 @@
       </div>
     </div>
     <div class="field">
-      <label>Échéance (optionnel)</label>
-      <input type="date" id="f_echeance">
+      <label>Date</label>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <input type="date" id="f_echeance" style="flex:1;">
+        <label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:12.5px;color:var(--muted);white-space:nowrap;">
+          <input type="checkbox" id="f_echeance_confirm" style="width:auto;"> Valider
+        </label>
+      </div>
     </div>
     <div class="field">
       <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;">
@@ -772,9 +777,9 @@ function renderKpiBar(m){
   const cls = v => v===null||v===undefined ? '' : (v>=0?'pos':'neg');
   const epargne = s.livretA; // livret A principal comme indicateur d'épargne
   bar.innerHTML = `
-    <div class="kpi"><div class="k-label">En cours</div><div class="k-value ${cls(live.encours)}">${fmtShort(live.encours)}</div></div>
-    <div class="kpi"><div class="k-label">Prévisionnel</div><div class="k-value ${cls(live.previsionnel)}">${fmtShort(live.previsionnel)}</div></div>
-    <div class="kpi"><div class="k-label">Épargne (Livret A)</div><div class="k-value">${fmtShort(epargne)}</div></div>
+    <div class="kpi"><div class="k-label">En cours</div><div class="k-value ${cls(live.encours)}">${fmt(live.encours)}</div></div>
+    <div class="kpi"><div class="k-label">Prévisionnel</div><div class="k-value ${cls(live.previsionnel)}">${fmt(live.previsionnel)}</div></div>
+    <div class="kpi"><div class="k-label">Épargne (Livret A)</div><div class="k-value">${fmt(epargne)}</div></div>
   `;
 }
 function renderTxRows(m){
@@ -859,7 +864,8 @@ function openItemModal(id){
     document.getElementById('f_sens').value = isCredit? 'recette':'depense';
     document.getElementById('f_categorie_type').value = deriveCategoryType(it.item);
     document.getElementById('f_categorie').value = it.categorie || 'LCL';
-    document.getElementById('f_echeance').value = it.echeance || '';
+    document.getElementById('f_echeance').value = it.echeance || new Date().toISOString().slice(0,10);
+    document.getElementById('f_echeance_confirm').checked = !!it.echeance;
     document.getElementById('f_traite').checked = !!it.traite;
     document.getElementById('f_recurrent').checked = !!it.recurrent;
   }else{
@@ -868,7 +874,8 @@ function openItemModal(id){
     document.getElementById('f_sens').value = 'depense';
     document.getElementById('f_categorie_type').value = 'Autre';
     document.getElementById('f_categorie').value = 'LCL';
-    document.getElementById('f_echeance').value = '';
+    document.getElementById('f_echeance').value = new Date().toISOString().slice(0,10);
+    document.getElementById('f_echeance_confirm').checked = false;
     document.getElementById('f_traite').checked = false;
     document.getElementById('f_recurrent').checked = false;
   }
@@ -886,7 +893,7 @@ function saveItemModal(){
   if(isNaN(montant)) montant = null;
   const sens = document.getElementById('f_sens').value;
   const categorie = document.getElementById('f_categorie').value;
-  const echeance = document.getElementById('f_echeance').value || null;
+  const echeance = document.getElementById('f_echeance_confirm').checked ? (document.getElementById('f_echeance').value || null) : null;
   const traite = document.getElementById('f_traite').checked;
   const recurrent = document.getElementById('f_recurrent').checked;
   if(montant!==null && sens==='recette' && categorie!=='Salaire') montant = -Math.abs(montant);
