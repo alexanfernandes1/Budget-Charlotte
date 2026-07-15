@@ -262,6 +262,17 @@
   .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px);pointer-events:auto;}
   .toast-action{color:inherit;text-decoration:underline;font-weight:700;margin-left:8px;cursor:pointer;white-space:nowrap;}
 
+  .update-banner{
+    position:fixed;top:0;left:0;right:0;z-index:70;
+    background:var(--teal-bright);color:#06231f;padding:9px 14px;font-size:13px;font-weight:600;
+    display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+    box-shadow:0 2px 8px rgba(0,0,0,.15);
+  }
+  .update-banner button{
+    background:#06231f;color:#fff;border:none;border-radius:6px;padding:5px 12px;
+    font-size:12.5px;font-weight:700;cursor:pointer;
+  }
+
   footer.data-tools{
     max-width:1100px;margin:0 auto;padding:8px 18px 30px;display:flex;gap:8px;flex-wrap:wrap;
     justify-content:center;
@@ -1463,6 +1474,37 @@ window.addEventListener('online', ()=>{ if(syncAccount) syncNow(); });
 window.addEventListener('offline', ()=> setSyncStatus('error', 'Hors ligne'));
 
 initMsal();
+
+// ===================== DÉTECTION DE NOUVELLE VERSION (écran d'accueil iOS) =====================
+// Une appli ajoutée à l'écran d'accueil (apple-mobile-web-app-capable) est souvent gardée
+// suspendue par iOS et rouverte sans recharger le réseau, contrairement à un onglet Safari.
+// On compare donc nous-mêmes, à chaque retour au premier plan, la date de dernière
+// modification du document chargé à celle du fichier actuellement publié (en-tête
+// Last-Modified), et on propose un rechargement — jamais automatique, pour ne pas perdre
+// une saisie en cours dans la modale.
+const PAGE_LAST_MODIFIED = document.lastModified;
+let updateCheckInFlight = false;
+async function checkForNewVersion(){
+  if(updateCheckInFlight) return;
+  updateCheckInFlight = true;
+  try{
+    const res = await fetch(location.href, { method:'HEAD', cache:'no-store' });
+    const latest = res.headers.get('last-modified');
+    if(latest && latest !== PAGE_LAST_MODIFIED) showUpdateBanner();
+  }catch(e){ /* hors-ligne ou réseau indisponible : on retentera au prochain retour au premier plan */ }
+  finally{ updateCheckInFlight = false; }
+}
+function showUpdateBanner(){
+  if(document.getElementById('updateBanner')) return;
+  const b = document.createElement('div');
+  b.id = 'updateBanner';
+  b.className = 'update-banner';
+  b.innerHTML = `Nouvelle version disponible <button id="btnReloadApp">Recharger</button>`;
+  document.body.appendChild(b);
+  document.getElementById('btnReloadApp').addEventListener('click', ()=> location.reload());
+}
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') checkForNewVersion(); });
+window.addEventListener('pageshow', checkForNewVersion);
 
 // ===================== INIT =====================
 populateSelects();
