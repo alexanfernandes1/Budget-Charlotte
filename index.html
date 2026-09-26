@@ -121,7 +121,9 @@
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;}
 
   /* ---------- table ---------- */
-  table.tx{width:100%;border-collapse:collapse;font-size:13px;}
+  /* separate + border-spacing:0 (pas collapse) : position:sticky sur les <th> ne fonctionne pas
+     correctement avec border-collapse:collapse (bug connu, y compris sur Safari iOS). */
+  table.tx{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;}
   table.tx th{
     text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:0.6px;
     color:var(--muted-2);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);
@@ -164,38 +166,47 @@
 
   /* ---------- responsive: compact rows on narrow screens (iPhone etc.) ---------- */
   @media (max-width:640px){
-    table.tx thead{display:none;}
-    table.tx, table.tx tbody{display:block;width:100%;}
-    table.tx tr{
-      display:flex;flex-wrap:wrap;align-items:center;gap:0 7px;
+    /* Modification en masse : cartes empilées (plusieurs champs de saisie par ligne, tiennent
+       mal dans un tableau étroit). Le tableau de lecture normal (Suivi du mois) garde, lui, un
+       vrai tableau compact ci-dessous — ses intitulés de colonnes doivent rester réels pour
+       pouvoir se figer avec les boutons/filtres au défilement. */
+    table.tx.edit-mode thead{display:none;}
+    table.tx.edit-mode, table.tx.edit-mode tbody{display:block;width:100%;}
+    table.tx.edit-mode tr{
+      display:flex;flex-wrap:wrap;align-items:flex-start;row-gap:6px;
       border:1px solid var(--line);border-radius:9px;margin-bottom:5px;padding:7px 10px;
       background:var(--panel);
     }
-    table.tx td{display:block;border-bottom:none;padding:0;}
-    table.tx td:nth-child(1){order:1;}                             /* case à cocher */
-    table.tx td:nth-child(2){                                      /* libellé */
-      order:2;flex:1;min-width:0;font-size:13.5px;font-weight:500;
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-    }
-    table.tx td:nth-child(5){order:3;font-size:14px;}              /* montant */
-    table.tx td:nth-child(6){order:4;}                             /* crayon */
-    table.tx tr::after{content:'';width:100%;order:5;}             /* saut de ligne */
-    table.tx td:nth-child(3){order:6;margin-left:auto;margin-top:3px;} /* catégorie, à droite */
-    table.tx td:nth-child(4){order:7;margin-top:3px;}              /* compte */
-    table.tx td:nth-child(3) .tag, table.tx td:nth-child(4) .tag{font-size:9.5px;padding:1px 6px;}
-
-    /* Modification en masse : mise en page dédiée (les champs de saisie pleine largeur cassent
-       la logique de réordonnancement ci-dessus, pensée pour du texte/des tags en lecture seule). */
-    table.tx.edit-mode tr{align-items:flex-start;row-gap:6px;}
-    table.tx.edit-mode td{padding:0;}
+    table.tx.edit-mode td{display:block;border-bottom:none;padding:0;}
     table.tx.edit-mode td:nth-child(1){order:1;padding-top:6px;}
     table.tx.edit-mode td:nth-child(2){order:2;flex:1;min-width:0;font-size:13.5px;font-weight:500;white-space:normal;}
     table.tx.edit-mode td:nth-child(6){order:3;padding-top:4px;}
-    table.tx.edit-mode tr::after{order:4;}
+    table.tx.edit-mode tr::after{content:'';width:100%;order:4;}
     table.tx.edit-mode td:nth-child(3){order:5;flex:1 1 46%;margin:0;}
     table.tx.edit-mode td:nth-child(4){order:6;flex:1 1 46%;margin:0;}
     table.tx.edit-mode td:nth-child(5){order:7;flex:1 1 100%;margin:0;}
     table.tx.edit-mode select{font-size:12.5px;}
+
+    /* Tableau de lecture compact : on resserre plutôt que de passer en cartes, pour garder de
+       vrais <th> (intitulés figés en haut, voir .tx-sticky-controls et table.tx thead th). */
+    /* table-layout:fixed + largeurs explicites : évite que les tags Catégorie/Compte n'écrasent
+       la colonne Libellé (qui a besoin du plus de place) et empêche les coupures de mots moches. */
+    table.tx:not(.edit-mode){font-size:11.5px;table-layout:fixed;}
+    table.tx:not(.edit-mode) th, table.tx:not(.edit-mode) td{padding:6px 5px;}
+    table.tx:not(.edit-mode) th{white-space:normal;letter-spacing:0;line-height:1.25;font-size:9.5px;}
+    table.tx:not(.edit-mode) td:nth-child(2){white-space:normal;overflow-wrap:break-word;}
+    table.tx:not(.edit-mode) .tag{font-size:9px;padding:1px 5px;white-space:normal;}
+    table.tx:not(.edit-mode) th:nth-child(1), table.tx:not(.edit-mode) td:nth-child(1){width:24px;padding-left:8px;padding-right:2px;}
+    table.tx:not(.edit-mode) th:nth-child(2), table.tx:not(.edit-mode) td:nth-child(2){width:35%;}
+    table.tx:not(.edit-mode) th:nth-child(3), table.tx:not(.edit-mode) td:nth-child(3){width:20%;}
+    table.tx:not(.edit-mode) th:nth-child(4), table.tx:not(.edit-mode) td:nth-child(4){width:13%;}
+    table.tx:not(.edit-mode) th:nth-child(5), table.tx:not(.edit-mode) td:nth-child(5){width:21%;white-space:nowrap;}
+    table.tx:not(.edit-mode) th:nth-child(6), table.tx:not(.edit-mode) td:nth-child(6){width:24px;padding-right:8px;}
+    /* Pas de défilement horizontal ici : un overflow-x sur ce conteneur casserait le
+       position:sticky vertical des <th> (l'overflow-y calculé bascule aussi en "auto", ce qui
+       recadre le sticky sur ce conteneur au lieu de la page — comportement de la spec CSS
+       Overflow). Le tableau doit donc tenir dans la largeur de l'écran ; texte du libellé et
+       tags se resserrent/passent à la ligne au lieu de déborder. */
 
     /* Sur petit écran, la flèche bas flottante gêne le tableau : on la remplace par une version
        inline à gauche du champ de recherche (voir .scroll-jump-inline dans la filter-bar). */
@@ -217,6 +228,18 @@
   }
   .filter-bar input[type=text]{flex:1;min-width:120px;}
 
+  /* Bloc boutons d'action + recherche/filtre, figé juste sous la barre de KPI (elle-même figée
+     sous l'en-tête) : --kpibar-h/--controls-h sont mesurés en JS (voir updateHeaderHeight). */
+  .tx-sticky-controls{
+    position:sticky;top:calc(var(--header-h) + var(--kpibar-h, 0px));z-index:14;
+    background:var(--bg);padding-top:2px;
+  }
+  table.tx thead th{
+    position:sticky;
+    top:calc(var(--header-h) + var(--kpibar-h, 0px) + var(--controls-h, 0px));
+    background:var(--bg);z-index:13;
+  }
+
   .btn{
     background:var(--teal-soft);color:var(--teal-bright);border:1px solid var(--teal);
     border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:var(--sans);
@@ -226,6 +249,12 @@
   .btn.ghost{background:none;color:var(--muted);border-color:var(--line);}
   .btn.ghost:hover{color:var(--ink);border-color:var(--muted-2);}
   .btn.small{padding:5px 10px;font-size:12px;}
+  .btn.premium{
+    background:linear-gradient(135deg, var(--teal-bright), var(--teal));
+    color:#fff;border:none;box-shadow:0 3px 10px rgba(31,111,102,0.35);
+    font-weight:600;
+  }
+  .btn.premium:hover{filter:brightness(1.08);box-shadow:0 4px 14px rgba(31,111,102,0.45);}
   .fab{
     position:fixed;bottom:20px;right:20px;z-index:30;
     width:52px;height:52px;border-radius:50%;background:var(--teal);color:#06231f;
@@ -432,6 +461,11 @@
       <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;">
         <input type="checkbox" id="f_recurrent" style="width:auto;"> Récurrent chaque mois (repris automatiquement à la création du mois suivant)
       </label>
+    </div>
+    <div class="field" id="f_recurrent_until_wrap" style="display:none;">
+      <label>Jusqu'à quel mois ?</label>
+      <input type="month" id="f_recurrent_until">
+      <div class="bulk-hint" style="margin:4px 0 0;">Laissez vide pour une récurrence sans fin. Rempli, la dépense est aussi ajoutée directement à tous les mois déjà créés jusque-là (sans jamais créer de nouveau mois).</div>
     </div>
     <div class="modal-actions">
       <button class="btn ghost" id="btnDeleteItem" style="display:none;margin-right:auto;">Supprimer</button>
@@ -864,7 +898,7 @@ function renderDashboard(){
 }
 
 // ===================== RENDER: TRANSACTIONS =====================
-let txFilter = { text:'', cat:'all', status:'all', rec:'all' };
+let txFilter = { text:'', status:'all' };
 let bulkEditMode = false;
 let bulkDraft = [];
 function renderTransactions(){
@@ -881,27 +915,21 @@ function renderTransactions(){
   const showResync = hasOwnAnchor && !!getMonth(prevKeyForResync);
   el.innerHTML = `
     <div class="kpi-bar" id="kpiBar"></div>
-    <div class="section-title">Suivi du budget — ${monthLabel(currentKey)}
-      <span class="hint" style="display:inline-flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn ghost small" id="btnBulkEdit">Modifier en masse</button>
-        <button class="btn ghost small" id="btnNewMonth">Créer le mois suivant à partir de celui-ci</button>
-        ${showResync ? `<button class="btn ghost small" id="btnResyncBalance" title="Recalcule la balance courante et les soldes de livret de ce mois à partir des valeurs en direct de fin ${monthLabel(prevKeyForResync)}, sans toucher aux lignes de ce mois.">Resynchroniser les soldes de départ</button>` : ''}
-      </span>
-    </div>
-    <div class="filter-bar">
-      <button class="scroll-jump-inline" id="scrollDownBtnMobile" title="Aller en bas du tableau" aria-label="Aller en bas du tableau">↓</button>
-      <input type="text" id="txSearch" placeholder="Rechercher un libellé…" value="${esc(txFilter.text)}">
-      <select id="txCatFilter"><option value="all">Toutes catégories</option>${CATEGORY_TYPES.map(c=>`<option value="${c}" ${txFilter.cat===c?'selected':''}>${c}</option>`).join('')}</select>
-      <select id="txStatusFilter">
-        <option value="all" ${txFilter.status==='all'?'selected':''}>Tous statuts</option>
-        <option value="done" ${txFilter.status==='done'?'selected':''}>Traité</option>
-        <option value="pending" ${txFilter.status==='pending'?'selected':''}>À venir</option>
-      </select>
-      <select id="txRecFilter">
-        <option value="all" ${txFilter.rec==='all'?'selected':''}>Récurrent : tous</option>
-        <option value="rec" ${txFilter.rec==='rec'?'selected':''}>🔁 Récurrentes</option>
-        <option value="once" ${txFilter.rec==='once'?'selected':''}>Ponctuelles</option>
-      </select>
+    <div class="tx-sticky-controls">
+      <div class="hint" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <button class="btn premium small" id="btnBulkEdit">Modifier en masse</button>
+        <button class="btn premium small" id="btnNewMonth">Créer le mois suivant à partir de celui-ci</button>
+        ${showResync ? `<button class="btn premium small" id="btnResyncBalance" title="Recalcule la balance courante et les soldes de livret de ce mois à partir des valeurs en direct de fin ${monthLabel(prevKeyForResync)}, sans toucher aux lignes de ce mois.">Resynchroniser les soldes de départ</button>` : ''}
+      </div>
+      <div class="filter-bar">
+        <button class="scroll-jump-inline" id="scrollDownBtnMobile" title="Aller en bas du tableau" aria-label="Aller en bas du tableau">↓</button>
+        <input type="text" id="txSearch" placeholder="Rechercher un libellé…" value="${esc(txFilter.text)}">
+        <select id="txStatusFilter">
+          <option value="all" ${txFilter.status==='all'?'selected':''}>Tous statuts</option>
+          <option value="done" ${txFilter.status==='done'?'selected':''}>Traité</option>
+          <option value="pending" ${txFilter.status==='pending'?'selected':''}>À venir</option>
+        </select>
+      </div>
     </div>
     <div class="panel" style="padding:0;">
       <table class="tx" id="txTable"><thead><tr>
@@ -910,9 +938,7 @@ function renderTransactions(){
     </div>
   `;
   document.getElementById('txSearch').addEventListener('input', e=>{ txFilter.text = e.target.value; renderTxRows(getMonth(currentKey)); });
-  document.getElementById('txCatFilter').addEventListener('change', e=>{ txFilter.cat = e.target.value; renderTxRows(getMonth(currentKey)); });
   document.getElementById('txStatusFilter').addEventListener('change', e=>{ txFilter.status = e.target.value; renderTxRows(getMonth(currentKey)); });
-  document.getElementById('txRecFilter').addEventListener('change', e=>{ txFilter.rec = e.target.value; renderTxRows(getMonth(currentKey)); });
   document.getElementById('btnNewMonth').addEventListener('click', createNextMonth);
   document.getElementById('btnBulkEdit').addEventListener('click', enterBulkEditMode);
   const resyncBtn = document.getElementById('btnResyncBalance');
@@ -920,6 +946,7 @@ function renderTransactions(){
   document.getElementById('scrollDownBtnMobile').addEventListener('click', scrollToTableBottom);
   renderKpiBar(m);
   renderTxRows(m);
+  updateHeaderHeight();
 }
 // Détache les soldes de départ du mois affiché (balance courante + les 4 livrets) de leur
 // ancre figée (SEED ou overlay), pour qu'ils redeviennent dérivés en direct des valeurs de fin
@@ -1051,11 +1078,8 @@ function renderTxRows(m){
   if(!m){ tbody.innerHTML = `<tr><td colspan="6" class="empty">Mois vide.</td></tr>`; return; }
   let items = m.items.filter(it=>it.item || it.montant);
   if(txFilter.text) items = items.filter(it=> (it.item||'').toLowerCase().includes(txFilter.text.toLowerCase()));
-  if(txFilter.cat!=='all') items = items.filter(it=> getCategoryType(it)===txFilter.cat);
   if(txFilter.status==='done') items = items.filter(it=>it.traite);
   if(txFilter.status==='pending') items = items.filter(it=>!it.traite);
-  if(txFilter.rec==='rec') items = items.filter(it=>it.recurrent);
-  if(txFilter.rec==='once') items = items.filter(it=>!it.recurrent);
 
   if(!items.length){ tbody.innerHTML = `<tr><td colspan="6" class="empty">Aucune ligne ne correspond.</td></tr>`; return; }
 
@@ -1092,8 +1116,8 @@ function createNextMonth(){
   if(existing && existing.items.some(it=>it.item||it.montant)){
     if(!confirm(`${monthLabel(nextKey)} contient déjà ${existing.items.length} lignes. Les remplacer par les lignes récurrentes de ${monthLabel(currentKey)} ?`)) return;
   }
-  const recurring = cur.items.filter(it=>it.item && it.recurrent).map(it=>({
-    item: it.item, echeance: null, categorie: it.categorie, categorieType: it.categorieType, montant: it.montant, traite:false, recurrent:true
+  const recurring = cur.items.filter(it=>it.item && it.recurrent && (!it.recurrentUntil || nextKey<=it.recurrentUntil)).map(it=>({
+    item: it.item, echeance: null, categorie: it.categorie, categorieType: it.categorieType, montant: it.montant, traite:false, recurrent:true, recurrentUntil: it.recurrentUntil || null
   }));
   if(!recurring.length){ showToast("Aucune ligne récurrente à reprendre — marquez vos dépenses/recettes fixes comme récurrentes."); }
   // balance_prec et les 4 soldes de livret sont explicitement forcés à null (et pas simplement
@@ -1142,6 +1166,7 @@ function openItemModal(id){
     document.getElementById('f_echeance_confirm').checked = !!it.echeance;
     document.getElementById('f_traite').checked = !!it.traite;
     document.getElementById('f_recurrent').checked = !!it.recurrent;
+    document.getElementById('f_recurrent_until').value = it.recurrentUntil || '';
   }else{
     document.getElementById('f_item').value = '';
     document.getElementById('f_montant').value = '';
@@ -1152,11 +1177,19 @@ function openItemModal(id){
     document.getElementById('f_echeance_confirm').checked = false;
     document.getElementById('f_traite').checked = false;
     document.getElementById('f_recurrent').checked = false;
+    document.getElementById('f_recurrent_until').value = '';
   }
   categoryTypeTouched = false;
   updateSensLabels();
+  updateRecurrentUntilVisibility();
   bg.classList.add('show');
 }
+// Le champ "jusqu'à quel mois" n'a de sens que si la ligne est récurrente.
+function updateRecurrentUntilVisibility(){
+  const wrap = document.getElementById('f_recurrent_until_wrap');
+  wrap.style.display = document.getElementById('f_recurrent').checked ? '' : 'none';
+}
+document.getElementById('f_recurrent').addEventListener('change', updateRecurrentUntilVisibility);
 // Sur un compte d'épargne, "Dépense"/"Recette" est trompeur (verser sur son Livret A n'est pas
 // vécu comme une "dépense") : on reformule selon le sens réel de l'argent pour ce compte-là.
 function updateSensLabels(){
@@ -1177,6 +1210,7 @@ document.getElementById('f_item').addEventListener('input', e=>{
 document.getElementById('f_categorie_type').addEventListener('change', e=>{
   categoryTypeTouched = true;
   if(!editingId) document.getElementById('f_recurrent').checked = RECURRING_DEFAULT_CATEGORIES.includes(e.target.value);
+  updateRecurrentUntilVisibility();
 });
 function closeItemModal(){ document.getElementById('itemModalBg').classList.remove('show'); editingId=null; }
 function saveItemModal(){
@@ -1189,13 +1223,14 @@ function saveItemModal(){
   const echeance = document.getElementById('f_echeance_confirm').checked ? (document.getElementById('f_echeance').value || null) : null;
   const traite = document.getElementById('f_traite').checked;
   const recurrent = document.getElementById('f_recurrent').checked;
+  const recurrentUntil = recurrent ? (document.getElementById('f_recurrent_until').value || null) : null;
   if(montant!==null && sens==='recette' && categorie!=='Salaire') montant = -Math.abs(montant);
   else if(montant!==null) montant = Math.abs(montant);
 
   const monthField = document.getElementById('f_month').value;
   const targetKey = keys.includes(monthField) ? monthField : currentKey;
   const wasEditing = !!editingId;
-  const payload = { item, montant, categorie, categorieType, echeance, traite, recurrent };
+  const payload = { item, montant, categorie, categorieType, echeance, traite, recurrent, recurrentUntil };
 
   if(targetKey === currentKey){
     let m = getMonth(currentKey);
@@ -1215,15 +1250,41 @@ function saveItemModal(){
     setMonthItems(targetKey, [...target.items, payload]);
   }
 
+  const propagatedCount = (recurrent && recurrentUntil) ? propagateRecurrence(payload, targetKey, recurrentUntil) : 0;
+
   closeItemModal();
   refreshAll();
 
+  const propSuffix = propagatedCount ? ` (reprise sur ${propagatedCount} mois suivant${propagatedCount>1?'s':''})` : '';
   if(targetKey === currentKey){
-    showToast('Ligne enregistrée.');
+    showToast('Ligne enregistrée.' + propSuffix);
   }else{
     const verb = wasEditing ? 'déplacée vers' : 'ajoutée à';
-    showToast(`Ligne ${verb} ${monthLabel(targetKey)}.`, { actionLabel:'Voir', onAction: ()=>{ currentKey = targetKey; refreshAll(); } });
+    showToast(`Ligne ${verb} ${monthLabel(targetKey)}.${propSuffix}`, { actionLabel:'Voir', onAction: ()=>{ currentKey = targetKey; refreshAll(); } });
   }
+}
+// Ajoute la dépense récurrente à tous les mois déjà créés entre fromKey (exclu) et untilKey
+// (inclus), en s'arrêtant dès qu'un mois n'existe pas encore — jamais de création forcée d'un
+// nouveau mois ici (voir createNextMonth pour la suite automatique lors de la création réelle
+// du mois suivant). N'ajoute rien si une ligne récurrente identique (même libellé + compte) est
+// déjà présente dans un mois cible, pour rester ré-appliquable sans dupliquer (ex : on prolonge
+// simplement la date de fin plus tard).
+function propagateRecurrence(sourceItem, fromKey, untilKey){
+  let key = fromKey;
+  let count = 0;
+  while(true){
+    key = shiftKey(key, 1);
+    if(untilKey && key > untilKey) break;
+    const target = getMonth(key);
+    if(!target) break;
+    const alreadyThere = target.items.some(it=> it.recurrent && it.item===sourceItem.item && it.categorie===sourceItem.categorie);
+    if(!alreadyThere){
+      const copy = { item: sourceItem.item, echeance: null, categorie: sourceItem.categorie, categorieType: sourceItem.categorieType, montant: sourceItem.montant, traite:false, recurrent:true, recurrentUntil: untilKey };
+      setMonthItems(key, [...target.items, copy]);
+      count++;
+    }
+  }
+  return count;
 }
 function deleteItemModal(){
   if(!editingId) return;
@@ -1440,6 +1501,13 @@ function drawDonut(id, byCat, legendId){
 function updateHeaderHeight(){
   const header = document.querySelector('header.top');
   if(header) document.documentElement.style.setProperty('--header-h', header.offsetHeight+'px');
+  // La barre de KPI et le bloc boutons/filtres (Suivi du mois) sont sticky l'un sous l'autre :
+  // on mesure leur hauteur réelle pour empiler correctement leurs offsets (voir .tx-sticky-controls
+  // et table.tx thead th dans app_shell.html). Absents hors de l'onglet Suivi : on retombe à 0.
+  const kpiBar = document.getElementById('kpiBar');
+  document.documentElement.style.setProperty('--kpibar-h', (kpiBar ? kpiBar.offsetHeight : 0)+'px');
+  const controls = document.querySelector('.tx-sticky-controls');
+  document.documentElement.style.setProperty('--controls-h', (controls ? controls.offsetHeight : 0)+'px');
 }
 function refreshAll(){
   _liveBalanceCache = new Map();
